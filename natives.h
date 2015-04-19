@@ -5,25 +5,39 @@
 #define m_int  int                                  /* integer */
 #define m_real double                               /* real */
 
-#define TEXT_SIZE 250
+#define STR_MEMSIZE 256
 
-typedef struct { char ch[TEXT_SIZE]; } m_text;  /* text */
+typedef struct m_str_t { char mem[STR_MEMSIZE]; } m_str;  /* text */
 
 /* Machine Instruction Stuff */
 #define OPERAND_MAX 4
 
 #define instr_opcode (instr[ip].opcode)
-#define instr_op0    (instr[ip].i_op[0])
-#define instr_op1    (instr[ip].i_op[1])
-#define instr_op2    (instr[ip].i_op[2])
-#define instr_op3    (instr[ip].i_op[3])
-#define instr_op4    (instr[ip].i_op[4])
+
+#define instr_iop0    (instr[ip].i_op[0])
+#define instr_iop1    (instr[ip].i_op[1])
+#define instr_iop2    (instr[ip].i_op[2])
+#define instr_iop3    (instr[ip].i_op[3])
+#define instr_iop4    (instr[ip].i_op[4])
+
+#define instr_rop0    (instr[ip].r_op[0])
+#define instr_rop1    (instr[ip].r_op[1])
+#define instr_rop2    (instr[ip].r_op[2])
+#define instr_rop3    (instr[ip].r_op[3])
+#define instr_rop4    (instr[ip].r_op[4])
+
+#define instr_sop0    (instr[ip].s_op[0])
+#define instr_sop1    (instr[ip].s_op[1])
+#define instr_sop2    (instr[ip].s_op[2])
+#define instr_sop3    (instr[ip].s_op[3])
+#define instr_sop4    (instr[ip].s_op[4])
 
 struct m_instr {
     int  opcode;
     m_int i_op[OPERAND_MAX];
     m_real r_op[OPERAND_MAX];
-    m_text t_op[OPERAND_MAX];
+    m_str s_op[OPERAND_MAX];
 };
 
 #endif // NATIVES_H_INCLUDED
+
