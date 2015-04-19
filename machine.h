@@ -32,12 +32,8 @@ static void* optable[] = {
     JUMP,
     JUMP_T,
     JUMP_F,
-    I_PUSH_CNST,
-    I_PUSH,
-    R_PUSH_CNST,
-    R_PUSH,
-    I_POP,
-    R_POP,
+    CALL,
+    RET,
     I_INC,
     I_DEC,
     I_ADD,
@@ -120,6 +116,7 @@ int machine(struct m_instr* instr)
         fetch_next_instr();
 
 
+
     /* Address-Value Copying Instructions. */
     I_COPY:
         mem.i[instr_iop0] = mem.i[instr_iop1];
@@ -137,7 +134,8 @@ int machine(struct m_instr* instr)
         fetch_next_instr();
 
 
-    /* Branching Instructions. */
+
+    /* Branching/Subroutine Instructions. */
     JUMP:
         ip = instr_iop0;
         fetch_next_instr();
@@ -150,40 +148,19 @@ int machine(struct m_instr* instr)
         ip = ( !(mem.i[instr_iop1]) ? instr_iop0 : ip + 1 );
         fetch_next_instr();
 
-
-    /* Stack Manipulation Instructions. */
-    I_PUSH_CNST:
-        mem.istk[++isp] = instr_iop0;
-        ip++;
+    CALL:
+        callstack[csp++] = ip; /* push return address. */
+        ip = mem.i[instr_iop0];
         fetch_next_instr();
 
-    I_PUSH:
-        mem.istk[++isp] = mem.i[instr_iop0];
-        ip++;
+    RET:
+        ip = callstack[--csp]; /* set instruction pointer so we return from func. */
         fetch_next_instr();
 
-    R_PUSH_CNST:
-        mem.rstk[++rsp] = instr_rop0;
-        ip++;
-        fetch_next_instr();
-
-    R_PUSH:
-        mem.rstk[++rsp] = mem.r[instr_iop0];
-        ip++;
-        fetch_next_instr();
-
-    I_POP:
-        mem.i[instr_iop0] = mem.istk[isp--];
-        ip++;
-        fetch_next_instr();
-
-    R_POP:
-        mem.r[instr_rop0] = mem.rstk[rsp--];
-        ip++;
-        fetch_next_instr();
 
 
     /* Arithmetic Instructions. */
+        /* integer arithmetic */
     I_INC:
         (mem.i[instr_iop0])++;
         ip++;
@@ -213,13 +190,13 @@ int machine(struct m_instr* instr)
         mem.i[instr_iop0] = (m_int) mem.i[instr_iop1] / mem.i[instr_iop2];
         ip++;
         fetch_next_instr();
-
     I_MOD:
         mem.i[instr_iop0] = mem.i[instr_iop1] % mem.i[instr_iop2];
         ip++;
         fetch_next_instr();
 
 
+        /* real arithmetic */
     R_ADD:
         mem.r[instr_iop0] = mem.r[instr_iop1] + mem.r[instr_iop2];
         ip++;
@@ -248,6 +225,7 @@ int machine(struct m_instr* instr)
 
 
     /* Logical Instructions.*/
+        /* integer logic */
     I_EQL:
         mem.i[instr_iop0] = mem.i[instr_iop1] == mem.i[instr_iop2];
         ip++;
@@ -257,28 +235,6 @@ int machine(struct m_instr* instr)
         mem.i[instr_iop1] = mem.i[instr_iop1] != mem.i[instr_iop2];
         ip++;
         fetch_next_instr();
-
-    R_EQL:
-        sprintf( gps1, "%f", mem.r[instr_iop1] );
-        sprintf( gps2, "%f", mem.r[instr_iop1] );
-        mem.i[instr_iop0] = strcmp(gps1, gps2) == 0;
-        ip++;
-        fetch_next_instr();
-
-    R_NEQL:
-        sprintf( gps1, "%f", mem.r[instr_iop1] );
-        sprintf( gps2, "%f", mem.r[instr_iop1] );
-        mem.i[instr_iop0] = strcmp(gps1, gps2) != 0;
-        ip++;
-        fetch_next_instr();
-
-    R_LT:
-
-    R_EQL_LT:
-
-    R_GT:
-
-    R_EQL_GT:
 
     I_LT:
         mem.i[instr_iop0] = mem.i[instr_iop1] < mem.i[instr_iop2];
@@ -314,6 +270,29 @@ int machine(struct m_instr* instr)
         ip++;
         fetch_next_instr();
 
+        /* real logic */
+    R_EQL:
+        sprintf( gps1, "%f", mem.r[instr_iop1] );
+        sprintf( gps2, "%f", mem.r[instr_iop1] );
+        mem.i[instr_iop0] = strcmp(gps1, gps2) == 0;
+        ip++;
+        fetch_next_instr();
+
+    R_NEQL:
+        sprintf( gps1, "%f", mem.r[instr_iop1] );
+        sprintf( gps2, "%f", mem.r[instr_iop1] );
+        mem.i[instr_iop0] = strcmp(gps1, gps2) != 0;
+        ip++;
+        fetch_next_instr();
+
+    R_LT:
+
+    R_EQL_LT:
+
+    R_GT:
+
+    R_EQL_GT:
+
     /* Bitwise Instructions. */
     I_INV_BW:
         mem.i[instr_iop0] = ~(mem.i[instr_iop0]);
@@ -336,11 +315,33 @@ int machine(struct m_instr* instr)
         fetch_next_instr();
 
 
+
     /* All String Instructions. */
+    S_CH_EQL:
+        mem.i[instr_iop0] = mem.s[instr_iop1][instr_iop2] == (mem.s[instr_iop3][instr_iop4];
+        ip++;
+        fetch_next_instr();
+
+    S_CH_NEQL:
+        mem.i[instr_iop0] = mem.s[instr_iop1][instr_iop2] != (mem.s[instr_iop3][instr_iop4];
+        ip++;
+        fetch_next_instr();
+
+    S_CH_COPY:
+        mem.s[instr_iop0][instr_iop1] = mem.s[instr_iop2][mem.s[instr_iop3];
+        ip++;
+        fetch_next_instr();
+
     S_LEN:
         mem.i[instr_iop0] = strlen(mem.s[instr_sop1]);
         ip++;
         fetch_next_instr();
+
+    S_JOIN:
+        strcat(mem.s[instr_iop0], mem.s[instr_iop1]);
+        ip++;
+        fetch_next_instr();
+
 
 
     /* All stdin/out related instructions. */
@@ -386,7 +387,6 @@ int machine(struct m_instr* instr)
         ip++;
         fetch_next_instr();
 
-
     I_COUT
         printf( "%d", mem.i[instr_iop0] );
         ip++;
@@ -431,9 +431,11 @@ int machine(struct m_instr* instr)
         ip++;
         fetch_next_instr();
 
+
     LEAVE:
         return retval;
 
 }
 
 #endif // MACHINE_H_INCLUDED
+
