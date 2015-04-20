@@ -86,7 +86,7 @@ static void* optable[] = {
 
 
 static inline
-int machine(struct m_instr* instr)
+int machine(struct m_program* program)
 {
     FILE* c_fptr;
     static struct m_memory mem;
@@ -149,7 +149,7 @@ int machine(struct m_instr* instr)
         fetch_next_instr();
 
     CALL:
-        callstack[csp++] = ip; /* push return address. */
+        callstack[csp++] = ip + 1; /* push return address. */
         ip = mem.i[instr_iop0];
         fetch_next_instr();
 
@@ -438,4 +438,5 @@ int machine(struct m_instr* instr)
 }
 
 #endif // MACHINE_H_INCLUDED
+
 
