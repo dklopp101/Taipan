@@ -1,13 +1,16 @@
 #ifndef NATIVES_H_INCLUDED
 #define NATIVES_H_INCLUDED
 
+#define STR_MEMSIZE        256
+#define RECORD_MEMBER_MAX   20
+
 /* Native Machine Datatypes */
-#define m_int  int                                  /* integer */
-#define m_real double                               /* real */
+#define m_int  int
+#define m_real double
 
-#define STR_MEMSIZE 256
-
-typedef struct m_str_t { char mem[STR_MEMSIZE]; } m_str;  /* text */
+typedef struct {
+    char mem[STR_MEMSIZE];
+} m_str;
 
 /* Machine Instruction Stuff */
 #define instr_opcode (instr[ip].opcode)
