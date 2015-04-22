@@ -3,67 +3,55 @@
 
 #include "natives.h"
 
+#define prv   (i_mem.vm[0])  /* process return value  */
+#define ip    (i_mem.vm[1])  /* instruction pointer   */
+#define csp   (i_mem.vm[2])  /* integer stack pointer */
+#define isp   (i_mem.vm[3])
+#define rsp   (i_mem.vm[4])
 
-/*  Memory Sizes & Specifications.
-    -------------------------------
+#define fin   (s_mem.vm[0])  /* stdin string buffer   */
+#define finp  (s_mem.vm[1])  /* stdin path buffer     */
+#define fout  (s_mem.vm[2])  /* stdout string buffer  */
+#define foutp (s_mem.vm[3])  /* stdout path buffer    */
 
-    Memory in tvm comes in two distinct flavors. The main memory and
-    dynamically allocated memory. Main memory is "built-in" memory,
-    this is simply an array that is put on the stack, it is split up
-    into sectors, registers, ram, stack, in that order. Dynamically
-    allocated memory is an array of pointers, the size of the array
-    being the absolute limit for how many arrays of memory can be
-    allocated by the machine code, although the actual size of the
-    allocated array has no bounds(other than those of the heap itself).
 
-    Integers and reals share the exact same memory specifications, but
-    of course they are separate, string memory is the same except there's
-    no stack for strings, so registers then ram and thats it.
+#define INT_VM_MEM_SIZE           10
+#define CALLSTACK_SIZE           200 /* defines subroutine recursion limit. */
 
-*/
-#define CALL_STACK_DEPTH 100  /* defines recursion limit. */
+#define INT_MAIN_MEM_SIZE        500
+#define INT_STACK_MEM_SIZE       200
 
-/* Integer Memory. */
-#define TOTAL_IMEM_SIZE  300  /* main memory. */
-#define INT_ARRAY_MAX    100  /* defines maximum number of arrays that can be allocated. */
+#define REAL_MAIN_MEM_SIZE       500
+#define REAL_STACK_MEM_SIZE      200
 
-/* Real Memory. */
-#define TOTAL_RMEM_SIZE  300
-#define REAL_ARRAY_MAX   100
-
-/* String Memory. */
-#define TOTAL_SMEM_SIZE  300
-#define STR_ARRAY_MAX    100
-
-/* Machine Used Registers */
-#define prv   (mem.i[0])  /* process return value  */
-#define ip    (mem.i[1])  /* instruction pointer   */
-#define csp   (mem.i[2])  /* integer stack pointer */
-#define fin   (mem.s[0])  /* stdin string buffer   */
-#define finp  (mem.s[1])  /* stdin path buffer     */
-#define fout  (mem.s[2])  /* stdout string buffer  */
-#define foutp (mem.s[3])  /* stdout path buffer    */
+#define STR_MAIN_MEM_SIZE        150
+#define #define STR_VM_MEM_SIZE    5
 
 /* Memory Initialization Macro. */
-#define initialize_memory() prv = ip = csp = 0;          \
-                            istk = i + INT_STACK_START;  \
-                            rstk = r + REAL_STACK_START; \
+#define initialize_memory() prv = ip = csp = isp = rsp = 0; \
+                            i_mem.memptr = i_mem.main;      \
+                            r_mem.memptr = r_mem.main;      \
+                            s_mem.memptr = s_mem.main;      \
 
-struct m_memory {
 
-    /* Call Stack. */
-    m_int* callstack[CALL_STACK_DEPTH];
+struct int_memory {
+    m_int *memptr;
+    m_int main[INT_MAIN_MEM_SIZE];
+    m_int vm[INT_VM_MEM_SIZE];
+    m_int stack[INT_STACK_MEM_SIZE];
+    m_int callstack[CALLSTACK_SIZE];
+};
 
-    /* Main Memory. */
-    m_int i[IMEM_SIZE];
-    m_real r[RMEM_SIZE];
-    m_str s[SMEM_SIZE]; /* first 4 of these cannot(shouldn't) be used by progrms. */
+struct real_memory {
+    m_real *memptr;
+    m_real main[REAL_MAIN_MEM_SIZE];
+    m_real stack[REAL_STACK_MEM_SIZE];
+};
 
-    /* Dynamically Allocated Array Pointer Arrays. */
-    m_int* i_arr[INT_ARRAY_MAX];
-    m_real* r_arr[REAL_ARRAY_MAX];
-    m_str* s_arr[STR_ARRAY_MAX];
-
+struct string_memory {
+    m_str *memptr;
+    m_str main[STR_MAIN_MEM_SIZE];
+    m_str vm[STR_VM_MEM_SIZE];
 };
 
 #endif // MEMORY_H_INCLUDED
