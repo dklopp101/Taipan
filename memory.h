@@ -3,21 +3,29 @@
 
 #include "natives.h"
 
-#define prv   (i_mem.vm[0])  /* process return value  */
-#define ip    (i_mem.vm[1])  /* instruction pointer   */
-#define csp   (i_mem.vm[2])  /* integer stack pointer */
-#define isp   (i_mem.vm[3])
-#define rsp   (i_mem.vm[4])
+#define prv        (i_mem.vm[0])     /* process return value          */
+#define ip         (i_mem.vm[1])     /* instruction pointer           */
+#define csp        (i_mem.vm[2])     /* subroutine call stack pointer */
+#define isp        (i_mem.vm[3])     /* integer stack pointer         */
+#define rsp        (i_mem.vm[4])     /* real stack pointer            */
+#define imem       (i_mem.data)      /* integer memory access pointer */
+#define rmem       (r_mem.data)      /* real memory access pointer    */
+#define smem       (s_mem.data)      /* string memory access pointer  */
+#define src_stack  (i_mem.callstack) /* subroutine callstack          */
+#define istack     (i_mem.stack)     /* integer stack access pointer  */
+#define rstack     (r_mem.stack)     /* real stack access pointer     */
+#define c_in       (s_mem.vm[0])     /* console-in buffer             */
+#define c_out      (s_mem.vm[2])     /* console-out-buffer            */
+#define c_in_p     (s_mem.vm[3])     /* console-in path buffer        */
+#define c_out_p    (s_mem.vm[4])     /* console-out path buffer       */
+#define f_in       (s_mem.vm[5])     /* file-in buffer                */
+#define f_out      (s_mem.vm[6])     /* file-out buffer               */
+#define gpub1      (s_mem.vm[9])     /*  */
+#define gpub2      (s_mem.vm[10])
 
-#define fin   (s_mem.vm[0])  /* stdin string buffer   */
-#define finp  (s_mem.vm[1])  /* stdin path buffer     */
-#define fout  (s_mem.vm[2])  /* stdout string buffer  */
-#define foutp (s_mem.vm[3])  /* stdout path buffer    */
-
-
-#define INT_VM_MEM_SIZE           10
 #define CALLSTACK_SIZE           200 /* defines subroutine recursion limit. */
 
+#define INT_VM_MEM_SIZE           10
 #define INT_MAIN_MEM_SIZE        500
 #define INT_STACK_MEM_SIZE       200
 
@@ -25,33 +33,29 @@
 #define REAL_STACK_MEM_SIZE      200
 
 #define STR_MAIN_MEM_SIZE        150
-#define #define STR_VM_MEM_SIZE    5
+#define STR_VM_MEM_SIZE            5
 
-/* Memory Initialization Macro. */
-#define initialize_memory() prv = ip = csp = isp = rsp = 0; \
-                            i_mem.memptr = i_mem.main;      \
-                            r_mem.memptr = r_mem.main;      \
-                            s_mem.memptr = s_mem.main;      \
+#define FIN_BUF_SIZE             256
+#define FOUT_BUF_SIZE            256
+
+#define initialize_memory()     if (m_recursion_level == 1) prv = ip = csp = isp = rsp = 0
 
 
 struct int_memory {
-    m_int *memptr;
-    m_int main[INT_MAIN_MEM_SIZE];
-    m_int vm[INT_VM_MEM_SIZE];
-    m_int stack[INT_STACK_MEM_SIZE];
-    m_int callstack[CALLSTACK_SIZE];
+    int data[INT_MAIN_MEM_SIZE];
+    int vm[INT_VM_MEM_SIZE];
+    int stack[INT_STACK_MEM_SIZE];
+    int callstack[CALLSTACK_SIZE];
 };
 
 struct real_memory {
-    m_real *memptr;
-    m_real main[REAL_MAIN_MEM_SIZE];
-    m_real stack[REAL_STACK_MEM_SIZE];
+    double data[REAL_MAIN_MEM_SIZE];
+    double stack[REAL_STACK_MEM_SIZE];
 };
 
 struct string_memory {
-    m_str *memptr;
-    m_str main[STR_MAIN_MEM_SIZE];
-    m_str vm[STR_VM_MEM_SIZE];
+    char data[STR_MAIN_MEM_SIZE][STR_MEMSIZE];
+    char vm[STR_VM_MEM_SIZE][STR_MEMSIZE];
 };
 
 #endif // MEMORY_H_INCLUDED
