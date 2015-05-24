@@ -1,6 +1,8 @@
 #ifndef VM_H_INCLUDED
 #define VM_H_INCLUDED
 
+#define execute_next(instr) goto *optable[(instr)->opcode]
+
 #define JUMP           0
 #define JUMP_T         1
 #define JUMP_F         2
@@ -82,64 +84,64 @@ int tprocess(instr_t* is)
 
     // Jump to program start instruction.
     reg.ip = is + is[0].iop[0];
-    goto *optable[reg.ip->opcode];
+    execute_next(reg.ip);
 
 
     /// Instruction Code
     jump:
         reg.ip = is + reg.ip->iop[0];
-        goto *optable[reg.ip->opcode];
+        execute_next(reg.ip);
 
     jump_t:
         if (reg.bool_flag) {
             reg.ip = is + reg.ip->iop[0];
-            goto *optable[reg.ip->opcode];
+            execute_next(reg.ip);
         } else {
-            goto *optable[(reg.ip++)->opcode];
+            execute_next(reg.ip++);
         }
 
     jump_f:
         if (reg.bool_flag) {
             reg.ip = is + reg.ip->iop[0];
-            goto *optable[reg.ip->opcode];
+            execute_next(reg.ip);
         } else {
-            goto *optable[(reg.ip++)->opcode];
+            execute_next(reg.ip++);
         }
 
     i_push:
         (reg.isp)++;
         istk[reg.isp] = reg.ip->iop[0];
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
     i_pop:
         reg.isp--;
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
     i_eql:
         reg.bool_flag = istk[--(reg.isp)] == istk[--(reg.isp)];
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
     i_neql:
         reg.bool_flag = istk[--(reg.isp)] != istk[--(reg.isp)];
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
     i_gt_eql:
         reg.bool_flag = istk[--(reg.isp)] >= istk[--(reg.isp)];
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
 
     i_lt_eql:
         reg.bool_flag = istk[--(reg.isp)] <= istk[--(reg.isp)];
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
 
     i_gt:
         reg.bool_flag = istk[--(reg.isp)] > istk[--(reg.isp)];
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
     i_lt:
         reg.bool_flag = istk[--(reg.isp)] < istk[--(reg.isp)];
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
     die:
         return reg.p_retval;
@@ -150,11 +152,11 @@ int tprocess(instr_t* is)
         printf("\nINTEGER STACK DUMP:\nisp: %d\n\n", reg.isp);
         for (i=0; i < INT_STACK_SIZE; ++i)
             printf("[%d] : %d\n", i, istk[i]);
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 
     dump_boolflag:
         printf("\nBOOL FLAG: %d\n", reg.bool_flag);
-        goto *optable[(reg.ip++)->opcode];
+        execute_next(reg.ip++);
 }
 
 #endif
