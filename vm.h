@@ -1,8 +1,6 @@
 #ifndef VM_H_INCLUDED
 #define VM_H_INCLUDED
 
-#define execute_next(instr) goto *optable[(instr)->opcode]
-
 #define JUMP           0
 #define JUMP_T         1
 #define JUMP_F         2
@@ -29,9 +27,8 @@ typedef unsigned char byte;
 #define INT_REG_SIZE      8
 
 /// INSTRUCTION.
-#define opc()  (ip->opcode)
-#define iop(n) (ip->iop[n])
-#define rop(n) (ip->rop[n])
+#define iop(n) ((prog[ip]).iop[n])
+#define execute_next(instr) goto *optable[(instr).opcode]
 
 typedef struct {
     byte opcode;
@@ -41,20 +38,22 @@ typedef struct {
 
 /// REGISTERS.
 typedef struct {
-    instr_t* ip;
     int p_retval, bool_flag, isp;
     int ireg[INT_REG_SIZE];
 } vmreg_t;
 
-#define init_registers() reg.ip = is;       \
-                         reg.bool_flag = 0; \
+#define init_registers() reg.bool_flag = 1; \
                          reg.p_retval = 0;  \
                          reg.isp = -1
 
+#define istk_push(v) ++reg.isp; istk[reg.isp] = v
+
+#define istk_pop()   istk[--(reg.isp)]
 
 /// VM FUNCTION.
-int tprocess(instr_t* is)
+int tprocess(instr_t* prog)
 { int i;
+    int ip;
 
     static void* optable[255] = {
         &&jump,
@@ -74,7 +73,7 @@ int tprocess(instr_t* is)
         &&die,
 
         &&dump_istk,
-        &&dump_boolflag,
+        &&dump_boolflag
     };
 
     vmreg_t reg;
@@ -83,65 +82,75 @@ int tprocess(instr_t* is)
     int istk[INT_STACK_SIZE];
 
     // Jump to program start instruction.
-    reg.ip = is + is[0].iop[0];
-    execute_next(reg.ip);
+    ip = prog->iop[0];
+    execute_next(prog[ip]);
 
 
     /// Instruction Code
     jump:
-        reg.ip = is + reg.ip->iop[0];
-        execute_next(reg.ip);
+        ip = iop(0);
+        execute_next(prog[ip]);
 
     jump_t:
         if (reg.bool_flag) {
-            reg.ip = is + reg.ip->iop[0];
-            execute_next(reg.ip);
+            ip = iop(0);
+            execute_next(prog[ip]);
         } else {
-            execute_next(reg.ip++);
+            ++ip;
+            execute_next(prog[ip]);
         }
 
     jump_f:
-        if (reg.bool_flag) {
-            reg.ip = is + reg.ip->iop[0];
-            execute_next(reg.ip);
+        if (!(reg.bool_flag)) {
+            ip = iop(0);
+            execute_next(prog[ip]);
         } else {
-            execute_next(reg.ip++);
+            ++ip;
+            execute_next(prog[ip]);
         }
 
     i_push:
-        (reg.isp)++;
-        istk[reg.isp] = reg.ip->iop[0];
-        execute_next(reg.ip++);
+        istk_push(iop(0));
+        ++ip;
+        execute_next(prog[ip]);
 
     i_pop:
         reg.isp--;
-        execute_next(reg.ip++);
+        ++ip;
+        execute_next(prog[ip]);
 
+    // Integer Logic.
     i_eql:
-        reg.bool_flag = istk[--(reg.isp)] == istk[--(reg.isp)];
-        execute_next(reg.ip++);
+        reg.bool_flag = istk_pop() == istk_pop();
+        ++ip;
+        execute_next(prog[ip]);
 
     i_neql:
-        reg.bool_flag = istk[--(reg.isp)] != istk[--(reg.isp)];
-        execute_next(reg.ip++);
+        reg.bool_flag = istk_pop() != istk_pop();
+        ++ip;
+        execute_next(prog[ip]);
 
     i_gt_eql:
-        reg.bool_flag = istk[--(reg.isp)] >= istk[--(reg.isp)];
-        execute_next(reg.ip++);
+        reg.bool_flag = istk_pop() >= istk_pop();
+        ++ip;
+        execute_next(prog[ip]);
 
 
     i_lt_eql:
-        reg.bool_flag = istk[--(reg.isp)] <= istk[--(reg.isp)];
-        execute_next(reg.ip++);
+        reg.bool_flag = istk_pop() <= istk_pop();
+        ++ip;
+        execute_next(prog[ip]);
 
 
     i_gt:
-        reg.bool_flag = istk[--(reg.isp)] > istk[--(reg.isp)];
-        execute_next(reg.ip++);
+        reg.bool_flag = istk_pop() > istk_pop();
+        ++ip;
+        execute_next(prog[ip]);
 
     i_lt:
-        reg.bool_flag = istk[--(reg.isp)] < istk[--(reg.isp)];
-        execute_next(reg.ip++);
+        reg.bool_flag = istk_pop() < istk_pop();
+        ++ip;
+        execute_next(prog[ip]);
 
     die:
         return reg.p_retval;
@@ -152,11 +161,13 @@ int tprocess(instr_t* is)
         printf("\nINTEGER STACK DUMP:\nisp: %d\n\n", reg.isp);
         for (i=0; i < INT_STACK_SIZE; ++i)
             printf("[%d] : %d\n", i, istk[i]);
-        execute_next(reg.ip++);
+        ++ip;
+        execute_next(prog[ip]);
 
     dump_boolflag:
         printf("\nBOOL FLAG: %d\n", reg.bool_flag);
-        execute_next(reg.ip++);
+        ++ip;
+        execute_next(prog[ip]);
 }
 
 #endif
