@@ -7,18 +7,29 @@
 
 #define I_PUSH         3
 #define I_POP          4
-#define I_EQL          5
 
+#define I_EQL          5
 #define I_NEQL         6
 #define I_GT_EQL       7
 #define I_LT_EQL       8
 #define I_GT           9
 #define I_LT          10
+#define I_AND         11
+#define I_OR          12
+#define I_NOT         13
 
-#define DIE           11
+#define I_ADD         14
+#define I_SUB         15
+#define I_MUL         16
+#define I_DIV         17
+#define I_MOD         18
+#define I_NEG         19
 
-#define DUMP_ISTK     12
-#define DUMP_BOOLFLAG 13
+#define DIE           20
+
+#define DUMP_ISTK     21
+#define DUMP_ISTKTOP  22
+#define DUMP_BOOLFLAG 23
 
 typedef unsigned char byte;
 
@@ -52,7 +63,7 @@ typedef struct {
 
 /// VM FUNCTION.
 int tprocess(instr_t* prog)
-{ int i;
+{ int i[4];
     int ip;
 
     static void* optable[255] = {
@@ -69,10 +80,21 @@ int tprocess(instr_t* prog)
         &&i_lt_eql,
         &&i_gt,
         &&i_lt,
+        &&i_and,
+        &&i_or,
+        &&i_not,
+
+        &&i_add,
+        &&i_sub,
+        &&i_mul,
+        &&i_div,
+        &&i_mod,
+        &&i_neg,
 
         &&die,
 
         &&dump_istk,
+        &&dump_istktop,
         &&dump_boolflag
     };
 
@@ -110,7 +132,8 @@ int tprocess(instr_t* prog)
         }
 
     i_push:
-        istk_push(iop(0));
+        ++(reg.isp);
+        istk[reg.isp] = iop(0);
         ++ip;
         execute_next(prog[ip]);
 
@@ -121,34 +144,186 @@ int tprocess(instr_t* prog)
 
     // Integer Logic.
     i_eql:
-        reg.bool_flag = istk_pop() == istk_pop();
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = i[0] == i[1];
+
         ++ip;
         execute_next(prog[ip]);
 
     i_neql:
-        reg.bool_flag = istk_pop() != istk_pop();
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = i[0] != i[1];
+
         ++ip;
         execute_next(prog[ip]);
 
     i_gt_eql:
-        reg.bool_flag = istk_pop() >= istk_pop();
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = i[0] >= i[1];
+
         ++ip;
         execute_next(prog[ip]);
 
 
     i_lt_eql:
-        reg.bool_flag = istk_pop() <= istk_pop();
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = i[0] <= i[1];
+
         ++ip;
         execute_next(prog[ip]);
 
 
     i_gt:
-        reg.bool_flag = istk_pop() > istk_pop();
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = i[0] > i[1];
+
         ++ip;
         execute_next(prog[ip]);
 
     i_lt:
-        reg.bool_flag = istk_pop() < istk_pop();
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = i[0] < i[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    i_and:
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = i[0] && i[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    i_or:
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = i[0] || i[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    i_not:
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        reg.bool_flag = !(i[0]);
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    i_add:
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        ++(reg.isp);
+        istk[reg.isp] = i[0] + i[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    i_sub:
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        ++(reg.isp);
+        istk[reg.isp] = i[0] - i[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    i_mul:
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        ++(reg.isp);
+        istk[reg.isp] = i[0] * i[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    i_div:
+        /// ONE DAY IMPLEMENT ERROR THROWING IF DIVIDING BY 0!
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        ++(reg.isp);
+        istk[reg.isp] = i[0] / i[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    i_mod:
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        i[1] = istk[reg.isp];
+        --(reg.isp);
+
+        ++(reg.isp);
+        istk[reg.isp] = i[0] % i[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+
+    i_neg:
+        i[0] = istk[reg.isp];
+        --(reg.isp);
+
+        ++(reg.isp);
+        istk[reg.isp] = ~(i[0]);
+
         ++ip;
         execute_next(prog[ip]);
 
@@ -159,8 +334,13 @@ int tprocess(instr_t* prog)
     // VM Debugging.
     dump_istk:
         printf("\nINTEGER STACK DUMP:\nisp: %d\n\n", reg.isp);
-        for (i=0; i < INT_STACK_SIZE; ++i)
-            printf("[%d] : %d\n", i, istk[i]);
+        for (i[0]=0; i[0] < INT_STACK_SIZE; ++i[0])
+            printf("[%d] : %d\n", i[0], istk[i[0]]);
+        ++ip;
+        execute_next(prog[ip]);
+
+    dump_istktop:
+        printf("\ninteger stack top: %d\n", istk[reg.isp]);
         ++ip;
         execute_next(prog[ip]);
 
