@@ -1,16 +1,24 @@
 #ifndef VM_H_INCLUDED
 #define VM_H_INCLUDED
 
-#define JUMP          0
-#define JUMP_T        1
-#define JUMP_F        2
-#define I_PUSH        3
-#define I_POP         4
-#define I_EQL         5
-#define DIE           6
+#define JUMP           0
+#define JUMP_T         1
+#define JUMP_F         2
 
-#define DUMP_ISTK     7
-#define DUMP_BOOLFLAG 8
+#define I_PUSH         3
+#define I_POP          4
+#define I_EQL          5
+
+#define I_NEQL         6
+#define I_GT_EQL       7
+#define I_LT_EQL       8
+#define I_GT           9
+#define I_LT          10
+
+#define DIE           11
+
+#define DUMP_ISTK     12
+#define DUMP_BOOLFLAG 13
 
 typedef unsigned char byte;
 
@@ -50,9 +58,17 @@ int tprocess(instr_t* is)
         &&jump,
         &&jump_t,
         &&jump_f,
+
         &&i_push,
         &&i_pop,
+
         &&i_eql,
+        &&i_neql,
+        &&i_gt_eql,
+        &&i_lt_eql,
+        &&i_gt,
+        &&i_lt,
+
         &&die,
 
         &&dump_istk,
@@ -108,21 +124,21 @@ int tprocess(instr_t* is)
         goto *optable[(reg.ip++)->opcode];
 
     i_gt_eql:
-        reg.bool_flag = istk[--(reg.isp)] != istk[--(reg.isp)];
+        reg.bool_flag = istk[--(reg.isp)] >= istk[--(reg.isp)];
         goto *optable[(reg.ip++)->opcode];
 
 
     i_lt_eql:
-        reg.bool_flag = istk[--(reg.isp)] != istk[--(reg.isp)];
+        reg.bool_flag = istk[--(reg.isp)] <= istk[--(reg.isp)];
         goto *optable[(reg.ip++)->opcode];
 
 
     i_gt:
-        reg.bool_flag = istk[--(reg.isp)] != istk[--(reg.isp)];
+        reg.bool_flag = istk[--(reg.isp)] > istk[--(reg.isp)];
         goto *optable[(reg.ip++)->opcode];
 
     i_lt:
-        reg.bool_flag = istk[--(reg.isp)] != istk[--(reg.isp)];
+        reg.bool_flag = istk[--(reg.isp)] < istk[--(reg.isp)];
         goto *optable[(reg.ip++)->opcode];
 
     die:
