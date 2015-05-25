@@ -1,39 +1,7 @@
 #ifndef VM_H_INCLUDED
 #define VM_H_INCLUDED
 
-#define JUMP           0
-#define JUMP_T         1
-#define JUMP_F         2
-
-#define CALL           3
-#define LEAVE          4
-
-#define I_CONST        5
-#define I_POP          6
-
-#define I_EQL          7
-#define I_NEQL         8
-#define I_GT_EQL       9
-#define I_LT_EQL      10
-#define I_GT          11
-#define I_LT          12
-#define I_AND         13
-#define I_OR          14
-#define I_NOT         15
-
-#define I_ADD         16
-#define I_SUB         17
-#define I_MUL         18
-#define I_DIV         19
-#define I_MOD         20
-#define I_NEG         21
-
-#define DIE           22
-
-#define DUMP_ISTK     23
-#define DUMP_ISTKTOP  24
-#define DUMP_BOOLFLAG 25
-#define DUMP_CSTK     26
+#include "opcodes.h"
 
 typedef unsigned char byte;
 
@@ -43,7 +11,6 @@ typedef unsigned char byte;
 #define INT_REG_SIZE      8
 
 /// SUBROUTINES.
-
 #define frame_base     (reg.frame_ptr[0])
 #define frame_calladdr (reg.frame_ptr[1])
 #define frame_retaddr  (reg.frame_ptr[2])
@@ -57,7 +24,7 @@ typedef unsigned char byte;
                          cstk[reg.csp+3] = 0;           \
                          reg.csp = 3
 
-/// INSTRUCTION.
+/// INSTRUCTIONS.
 #define iop(n) ((prog[ip]).iop[n])
 #define execute_next(instr) goto *optable[(instr).opcode]
 
@@ -82,44 +49,10 @@ typedef struct {
 /// VM FUNCTION.
 int tprocess(instr_t* prog)
 {
+    build_optable();
+
     int i[4];
     int ip = 0;
-
-    static void* optable[255] = {
-        &&jump,
-        &&jump_t,
-        &&jump_f,
-
-        &&call,
-        &&leave,
-
-        &&i_const,
-        &&i_pop,
-
-        &&i_eql,
-        &&i_neql,
-        &&i_gt_eql,
-        &&i_lt_eql,
-        &&i_gt,
-        &&i_lt,
-        &&i_and,
-        &&i_or,
-        &&i_not,
-
-        &&i_add,
-        &&i_sub,
-        &&i_mul,
-        &&i_div,
-        &&i_mod,
-        &&i_neg,
-
-        &&die,
-
-        &&dump_istk,
-        &&dump_istktop,
-        &&dump_boolflag,
-        &&dump_cstk
-    };
 
     vmreg_t reg;
     init_registers();
@@ -412,7 +345,7 @@ int tprocess(instr_t* prog)
         execute_next(prog[ip]);
 
     dump_cstk:
-        printf("\nCALL STACK DUMP:\nsub call count: %d, csp: %d\n\n", subcalls, reg.csp);
+        printf("\nCALL STACK DUMP:\ncsp: %d\n\n", reg.csp);
 
         for (i[0]=0; i[0] < CALLSTACK_SIZE; ++i[0])
             printf("[%d] : %d\n", i[0], cstk[i[0]]);
