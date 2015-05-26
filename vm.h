@@ -1,351 +1,278 @@
 #ifndef VM_H_INCLUDED
 #define VM_H_INCLUDED
 
-#define JUMP           0
-#define JUMP_T         1
-#define JUMP_F         2
+#include "opcodes.h"
 
-#define I_PUSH         3
-#define I_POP          4
+#define PROCESS_RETVAL_INDEX 0
 
-#define I_EQL          5
-#define I_NEQL         6
-#define I_GT_EQL       7
-#define I_LT_EQL       8
-#define I_GT           9
-#define I_LT          10
-#define I_AND         11
-#define I_OR          12
-#define I_NOT         13
+#define istk_top       (istk[isp])
+#define istk_pop()     (istk[isp--])
+#define istk_push(v)   (istk[++isp] = v)
 
-#define I_ADD         14
-#define I_SUB         15
-#define I_MUL         16
-#define I_DIV         17
-#define I_MOD         18
-#define I_NEG         19
-
-#define DIE           20
-
-#define DUMP_ISTK     21
-#define DUMP_ISTKTOP  22
-#define DUMP_BOOLFLAG 23
+#define fstk_top       (fstk[fsp)
+#define fstk_pop()     (fstk[fsp--])
+#define fstk_push(v)   (fstk[++fsp] = v)
 
 typedef unsigned char byte;
+typedef int t_int;
+typedef double t_float;
 
-#define INT_OPERAND_MAX   6
-#define INT_STACK_SIZE   40
-#define INT_REG_SIZE      8
+#define INT_OPERAND_MAX     6
+#define ISTK_SIZE          40
+#define IREG_SIZE           8
 
-/// INSTRUCTION.
+#define FLOAT_OPERAND_MAX   6
+#define FSTK_SIZE          40
+#define FREG_SIZE           8
+
+/// SUBROUTINES.
+#define CALLSTACK_SIZE     20
+
+typedef struct {
+    int stk[CALLSTACK_SIZE];
+    int* frame;
+} callstack_t;
+
+// Initalises callstack pointer, pushes main frame,
+// initalises frame pointer.
+#define init_callstack() cstk.stk[0] = 0;   \
+                         cstk.stk[1] = 0;   \
+                         cstk.stk[2] = 0;   \
+                         cstk.stk[3] = 0;   \
+                         cstk.frame = cstk.stk
+
+// Subroutine Callstack Frames.
+// frame: 0 - frame base (it's index in the callstack).
+//        1 - start instruction (first instruction of subroutine).
+//        2 - return instruction (instruction directly after subroutine call).
+//        3 - exception handler count (counts how many exception handlers in frame).
+//        n - frame base finder.
+//
+// When a subroutine is called it first pushes 0,1,2,3 of above onto the stack,
+// this is the head of the frame, when another subroutine is called from this one,
+// the frame base finder is pushed onto the callstack, then the frame pointer is
+// reset. This allows the previous frame base to be found no matter how many
+// exception handlers or whatever happends inside the stack.
+
+#define frame_base       (cstk.frame[0])
+#define frame_calladdr   (cstk.frame[1])
+#define frame_retaddr    (cstk.frame[2])
+#define frame_hcount     (cstk.frame[3])
+
+/// INSTRUCTIONS.
 #define iop(n) ((prog[ip]).iop[n])
+#define fop(n) ((prog[ip]).fop[n])
+
 #define execute_next(instr) goto *optable[(instr).opcode]
 
 typedef struct {
     byte opcode;
-    int iop[INT_OPERAND_MAX];
+    t_int iop[INT_OPERAND_MAX];
+    t_float fop[FLOAT_OPERAND_MAX];
 } instr_t;
 
 
-/// REGISTERS.
-typedef struct {
-    int p_retval, bool_flag, isp;
-    int ireg[INT_REG_SIZE];
-} vmreg_t;
-
-#define init_registers() reg.bool_flag = 1; \
-                         reg.p_retval = 0;  \
-                         reg.isp = -1
-
-#define istk_push(v) ++reg.isp; istk[reg.isp] = v
-
-#define istk_pop()   istk[--(reg.isp)]
-
 /// VM FUNCTION.
-int tprocess(instr_t* prog)
-{ int i[4];
-    int ip;
+int tprocess(instr_t* __restrict__ prog)
+{
+    build_optable();
 
-    static void* optable[255] = {
-        &&jump,
-        &&jump_t,
-        &&jump_f,
+    callstack_t cstk;
+    init_callstack();
 
-        &&i_push,
-        &&i_pop,
+    register int isp = -1;
+    register int fsp = -1;
+    register int csp = 0;
+    register int ip  = 0;
+    register t_int iop_left;
+    register t_int iop_right;
+    register t_float fop_left;
+    register t_float fop_right;
+    register char boolflag = 0;
 
-        &&i_eql,
-        &&i_neql,
-        &&i_gt_eql,
-        &&i_lt_eql,
-        &&i_gt,
-        &&i_lt,
-        &&i_and,
-        &&i_or,
-        &&i_not,
+    t_int ireg[IREG_SIZE];
+    t_float freg[FREG_SIZE];
 
-        &&i_add,
-        &&i_sub,
-        &&i_mul,
-        &&i_div,
-        &&i_mod,
-        &&i_neg,
+    t_int istk[ISTK_SIZE];
+    t_float fstk[FSTK_SIZE];
 
-        &&die,
 
-        &&dump_istk,
-        &&dump_istktop,
-        &&dump_boolflag
-    };
 
-    vmreg_t reg;
-    init_registers();
 
-    int istk[INT_STACK_SIZE];
 
-    // Jump to program start instruction.
-    ip = prog->iop[0];
     execute_next(prog[ip]);
 
 
-    /// Instruction Code
     jump:
         ip = iop(0);
         execute_next(prog[ip]);
 
     jump_t:
-        if (reg.bool_flag) {
+        if (boolflag == 1)
             ip = iop(0);
-            execute_next(prog[ip]);
-        } else {
+        else
             ++ip;
-            execute_next(prog[ip]);
-        }
+        execute_next(prog[ip]);
+
 
     jump_f:
-        if (!(reg.bool_flag)) {
+        if (boolflag == 1)
             ip = iop(0);
-            execute_next(prog[ip]);
-        } else {
+        else
             ++ip;
-            execute_next(prog[ip]);
-        }
-
-    i_push:
-        ++(reg.isp);
-        istk[reg.isp] = iop(0);
-        ++ip;
         execute_next(prog[ip]);
+
+    call:
+        // Finalise the current frame then set up the new one.
+        ++(csp);
+        cstk.stk[csp] = frame_base; // push the current frame's finder index.
+
+        ++(csp);
+        cstk.stk[csp] = csp + 1; // push the new frame's base(it's index in the callstack).
+
+        cstk.frame = cstk.stk + csp; // officiate the new frame by setting current frame.
+
+        ++(csp);
+        cstk.stk[csp] = iop(0); // push the index of the subr being called.
+
+        ++(csp);
+        cstk.stk[csp] = ip + 1; // push the index of the frame's return instruction.
+
+        ++(csp);
+        cstk.stk[csp] = 0; // push 0 to reserve a spot for the frame's exception handler counter.
+
+        ip = frame_calladdr;
+        execute_next(prog[ip]);
+
+    leave:
+        // Firstly set ip to the frame's return instruction.
+        ip = frame_retaddr;
+
+        // Exit the current frame to the next outer one by
+        // jumping to the outer frame's finder. Then setting
+        // the frame pointer to said frame, then decrement
+        // csp because the finder isnt needed anymore.
+        csp = frame_base;
+
+        cstk.frame = cstk.stk + cstk.stk[csp];
+        --(csp);
+
+        // Jump to the frame's return instruction.
+        execute_next(prog[ip]);
+
+    i_const:
+        istk_push(iop(0));
+        execute_next(prog[++ip]);
 
     i_pop:
-        reg.isp--;
-        ++ip;
-        execute_next(prog[ip]);
+        --isp;
+        execute_next(prog[++ip]);
 
     // Integer Logic.
     i_eql:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        reg.bool_flag = i[0] == i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        boolflag = istk_pop() == istk_pop();
+        execute_next(prog[++ip]);
 
     i_neql:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        reg.bool_flag = i[0] != i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        boolflag = istk_pop() == istk_pop();
+        execute_next(prog[++ip]);
 
     i_gt_eql:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        reg.bool_flag = i[0] >= i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        boolflag = istk_pop() == istk_pop();
+        execute_next(prog[++ip]);
 
 
     i_lt_eql:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        reg.bool_flag = i[0] <= i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
-
+        boolflag = istk_pop() == istk_pop();
+        execute_next(prog[++ip]);
 
     i_gt:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        reg.bool_flag = i[0] > i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        boolflag = istk_pop() == istk_pop();
+        execute_next(prog[++ip]);
 
     i_lt:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        reg.bool_flag = i[0] < i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        boolflag = istk_pop() == istk_pop();
+        execute_next(prog[++ip]);
 
     i_and:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        reg.bool_flag = i[0] && i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        boolflag = istk_pop() == istk_pop();
+        execute_next(prog[++ip]);
 
     i_or:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        reg.bool_flag = i[0] || i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        boolflag = istk_pop() == istk_pop();
+        execute_next(prog[++ip]);
 
     i_not:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
+        boolflag = !istk_pop();
+        execute_next(prog[++ip]);
 
-        reg.bool_flag = !(i[0]);
 
-        ++ip;
-        execute_next(prog[ip]);
-
+    // Integer Arithmetic.
     i_add:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        ++(reg.isp);
-        istk[reg.isp] = i[0] + i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        istk_top = istk_pop() + istk_top;
+        execute_next(prog[++ip]);
 
     i_sub:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        ++(reg.isp);
-        istk[reg.isp] = i[0] - i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        istk_top = istk_pop() - istk_top;
+        execute_next(prog[++ip]);
 
     i_mul:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        ++(reg.isp);
-        istk[reg.isp] = i[0] * i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        istk_top = istk_pop() * istk_top;
+        execute_next(prog[++ip]);
 
     i_div:
-        /// ONE DAY IMPLEMENT ERROR THROWING IF DIVIDING BY 0!
-        i[0] = istk[reg.isp];
-        --(reg.isp);
-
-        i[1] = istk[reg.isp];
-        --(reg.isp);
-
-        ++(reg.isp);
-        istk[reg.isp] = i[0] / i[1];
-
-        ++ip;
-        execute_next(prog[ip]);
+        istk_top = istk_pop() / istk_top;
+        execute_next(prog[++ip]);
 
     i_mod:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
+        istk_top = istk_pop() % istk_top;
+        execute_next(prog[++ip]);
 
-        i[1] = istk[reg.isp];
-        --(reg.isp);
+    i_inv:
+        istk_top = ~istk_top;
+        execute_next(prog[++ip]);
 
-        ++(reg.isp);
-        istk[reg.isp] = i[0] % i[1];
+    i_inc:
+        ++istk_top;
+        execute_next(prog[++ip]);
 
-        ++ip;
-        execute_next(prog[ip]);
+    i_dec:
+        --istk_top;
+        execute_next(prog[++ip]);
 
 
-    i_neg:
-        i[0] = istk[reg.isp];
-        --(reg.isp);
 
-        ++(reg.isp);
-        istk[reg.isp] = ~(i[0]);
-
-        ++ip;
-        execute_next(prog[ip]);
 
     die:
-        return reg.p_retval;
+        return ireg[PROCESS_RETVAL_INDEX];
 
 
     // VM Debugging.
     dump_istk:
-        printf("\nINTEGER STACK DUMP:\nisp: %d\n\n", reg.isp);
-        for (i[0]=0; i[0] < INT_STACK_SIZE; ++i[0])
-            printf("[%d] : %d\n", i[0], istk[i[0]]);
+        printf("\nINTEGER STACK DUMP:\nisp: %d\n\n", isp);
+        for (iop_left=0; iop_left < ISTK_SIZE; ++iop_left)
+            printf("[%d] : %d\n", iop_left, istk[iop_left]);
+
         ++ip;
         execute_next(prog[ip]);
 
     dump_istktop:
-        printf("\ninteger stack top: %d\n", istk[reg.isp]);
+        printf("\ninteger stack top: %d\n", istk[isp]);
         ++ip;
         execute_next(prog[ip]);
 
     dump_boolflag:
-        printf("\nBOOL FLAG: %d\n", reg.bool_flag);
+        printf("\nBOOL FLAG: %d\n", boolflag);
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    dump_cstk:
+        printf("\nCALL STACK DUMP:\ncsp: %d\n\n", csp);
+
+        for (iop_left=0; iop_left < CALLSTACK_SIZE; ++iop_left)
+            printf("[%d] : %d\n", iop_left, cstk.stk[iop_left]);
+
         ++ip;
         execute_next(prog[ip]);
 }
