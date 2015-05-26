@@ -1,53 +1,28 @@
 #ifndef VM_H_INCLUDED
 #define VM_H_INCLUDED
 
-#define JUMP           0
-#define JUMP_T         1
-#define JUMP_F         2
-
-#define CALL           3
-#define LEAVE          4
-
-#define I_CONST        5
-#define I_POP          6
-
-#define I_EQL          7
-#define I_NEQL         8
-#define I_GT_EQL       9
-#define I_LT_EQL      10
-#define I_GT          11
-#define I_LT          12
-#define I_AND         13
-#define I_OR          14
-#define I_NOT         15
-
-#define I_ADD         16
-#define I_SUB         17
-#define I_MUL         18
-#define I_DIV         19
-#define I_MOD         20
-#define I_NEG         21
-
-#define DIE           22
-
-#define DUMP_ISTK     23
-#define DUMP_ISTKTOP  24
-#define DUMP_BOOLFLAG 25
-#define DUMP_CSTK     26
+#include "opcodes.h"
 
 typedef unsigned char byte;
 
 #define CALLSTACK_SIZE   20
+
 #define INT_OPERAND_MAX   6
 #define INT_STACK_SIZE   40
 #define INT_REG_SIZE      8
 
-/// SUBROUTINES.
+#define FLOAT_OPERAND_MAX   6
+#define FLOAT_STACK_SIZE   40
+#define FLOAT_REG_SIZE      8
 
+/// SUBROUTINES.
 #define frame_base     (reg.frame_ptr[0])
 #define frame_calladdr (reg.frame_ptr[1])
 #define frame_retaddr  (reg.frame_ptr[2])
 #define frame_hcount   (reg.frame_ptr[3])
+
+typedef int t_int;
+typedef double t_float;
 
 // Push the base frame onto the callstack then insert the
 // opening call to the main subroutine.
@@ -55,80 +30,55 @@ typedef unsigned char byte;
                          cstk[reg.csp+1] = 0;           \
                          cstk[reg.csp+2] = 0;           \
                          cstk[reg.csp+3] = 0;           \
-                         reg.csp = 3
+                         reg.csp = 2;                   \
+                         reg.frame_ptr = cstk
 
-/// INSTRUCTION.
+#define push_frame(a, b, c, d) ++(reg.csp); cstk
+
+/// INSTRUCTIONS.
 #define iop(n) ((prog[ip]).iop[n])
+#define fop(n) ((prog[ip]).fop[n])
 #define execute_next(instr) goto *optable[(instr).opcode]
 
 typedef struct {
     byte opcode;
-    int iop[INT_OPERAND_MAX];
+    t_int iop[INT_OPERAND_MAX];
+    t_float fop[FLOAT_OPERAND_MAX];
 } instr_t;
 
 
 /// REGISTERS.
 typedef struct {
-    int p_retval, bool_flag, isp, csp;
-    int ireg[INT_REG_SIZE];
+    int p_retval, bool_flag, csp, isp, fsp;
+    t_int ireg[INT_REG_SIZE];
+    t_float freg[FLOAT_REG_SIZE];
     int* frame_ptr;
 } vmreg_t;
 
-#define init_registers() reg.bool_flag = 1; \
+#define init_registers() reg.bool_flag = 0; \
                          reg.p_retval = 0;  \
                          reg.isp = -1;      \
-                         reg.csp = -1
+                         reg.fsp = -1;      \
+                         reg.csp = 0
 
 /// VM FUNCTION.
 int tprocess(instr_t* prog)
-{ int i[4];
-    int ip = 0;
+{
+    build_optable();
 
-    static void* optable[255] = {
-        &&jump,
-        &&jump_t,
-        &&jump_f,
-
-        &&call,
-        &&leave,
-
-        &&i_const,
-        &&i_pop,
-
-        &&i_eql,
-        &&i_neql,
-        &&i_gt_eql,
-        &&i_lt_eql,
-        &&i_gt,
-        &&i_lt,
-        &&i_and,
-        &&i_or,
-        &&i_not,
-
-        &&i_add,
-        &&i_sub,
-        &&i_mul,
-        &&i_div,
-        &&i_mod,
-        &&i_neg,
-
-        &&die,
-
-        &&dump_istk,
-        &&dump_istktop,
-        &&dump_boolflag,
-        &&dump_cstk
-    };
+    t_int   i[3];
+    t_float f[3];
 
     vmreg_t reg;
     init_registers();
 
     int cstk[CALLSTACK_SIZE];
-    int istk[INT_STACK_SIZE];
-
     init_callstack();
 
+    t_int   istk[INT_STACK_SIZE];
+    t_float fstk[FLOAT_STACK_SIZE];
 
+    int ip = 0;
 
     execute_next(prog[ip]);
 
@@ -192,16 +142,32 @@ int tprocess(instr_t* prog)
         // Jump to the frame's return instruction.
         execute_next(prog[ip]);
 
+    // Push integer constant onto integer stack.
     i_const:
         ++(reg.isp);
         istk[reg.isp] = iop(0);
         ++ip;
         execute_next(prog[ip]);
 
+    // Pop value off top of integer stack.
+    // Right now it simply decrements isp because
+    // there's nowhere to pop to until the RAM/heap get's written.
     i_pop:
         reg.isp--;
         ++ip;
         execute_next(prog[ip]);
+
+    f_const:
+        ++(reg.fsp);
+        fstk[reg.fsp] = fop(0);
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_pop:
+        reg.fsp--;
+        ++ip;
+        execute_next(prog[ip]);
+
 
     // Integer Logic.
     i_eql:
@@ -311,6 +277,7 @@ int tprocess(instr_t* prog)
         ++ip;
         execute_next(prog[ip]);
 
+    // Integer Arithmetic.
     i_add:
         i[0] = istk[reg.isp];
         --(reg.isp);
@@ -378,7 +345,7 @@ int tprocess(instr_t* prog)
         execute_next(prog[ip]);
 
 
-    i_neg:
+    i_inv:
         i[0] = istk[reg.isp];
         --(reg.isp);
 
@@ -387,6 +354,105 @@ int tprocess(instr_t* prog)
 
         ++ip;
         execute_next(prog[ip]);
+
+
+    // Floating Point Logic.
+    f_eql:
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_neql:
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_gt_eql:
+        ++ip;
+        execute_next(prog[ip]);
+
+
+    f_lt_eql:
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_gt:
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_lt:
+        ++ip;
+        execute_next(prog[ip]);
+
+
+    // Floating Point Arithmetic
+    f_add:
+        f[0] = fstk[reg.fsp];
+        --(reg.fsp);
+
+        f[1] = fstk[reg.fsp];
+        --(reg.fsp);
+
+        ++(reg.fsp);
+        fstk[reg.fsp] = f[0] + f[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_sub:
+        f[0] = fstk[reg.fsp];
+        --(reg.fsp);
+
+        f[1] = fstk[reg.fsp];
+        --(reg.fsp);
+
+        ++(reg.fsp);
+        fstk[reg.fsp] = f[0] - f[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_mul:
+        f[0] = fstk[reg.fsp];
+        --(reg.fsp);
+
+        f[1] = fstk[reg.fsp];
+        --(reg.fsp);
+
+        ++(reg.fsp);
+        fstk[reg.fsp] = f[0] * f[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_div:
+        f[0] = fstk[reg.fsp];
+        --(reg.fsp);
+
+        f[1] = fstk[reg.fsp];
+        --(reg.fsp);
+
+        // Check for zero division.
+        /*if (f[1] == 0)
+            throw_exception(ZERO_DIVIDE_EXCEPTION);*/
+
+        ++(reg.fsp);
+        fstk[reg.fsp] = f[0] / f[1];
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    f_mod:
+
+        ++ip;
+        execute_next(prog[ip]);
+
+
+    f_inv:
+        ++ip;
+        execute_next(prog[ip]);
+
 
     die:
         return reg.p_retval;
@@ -406,6 +472,19 @@ int tprocess(instr_t* prog)
         ++ip;
         execute_next(prog[ip]);
 
+    dump_fstk:
+        printf("\nFLOAT STACK DUMP:\nfsp: %d\n\n", reg.fsp);
+        for (i[0]=0; i[0] < FLOAT_STACK_SIZE; ++i[0])
+            printf("[%d] : %f\n", i[0], fstk[i[0]]);
+
+        ++ip;
+        execute_next(prog[ip]);
+
+    dump_fstktop:
+        printf("\float stack top: %f\n", fstk[reg.fsp]);
+        ++ip;
+        execute_next(prog[ip]);
+
     dump_boolflag:
         printf("\nBOOL FLAG: %d\n", reg.bool_flag);
 
@@ -413,13 +492,14 @@ int tprocess(instr_t* prog)
         execute_next(prog[ip]);
 
     dump_cstk:
-        printf("\nCALL STACK DUMP:\ncsp: %d\n\n", reg.csp);
+        printf("\nCALL STACK DUMP:\n, csp: %d\n\n", reg.csp);
 
         for (i[0]=0; i[0] < CALLSTACK_SIZE; ++i[0])
             printf("[%d] : %d\n", i[0], cstk[i[0]]);
 
         ++ip;
         execute_next(prog[ip]);
+
 }
 
 #endif
