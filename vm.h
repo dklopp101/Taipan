@@ -5,6 +5,9 @@
 
 #define PROCESS_RETVAL_INDEX 0
 
+#define IARITH_OP_A (ireg[5])
+#define IARITH_OP_B (ireg[6])
+
 #define istk_top       (istk[isp])
 #define istk_pop()     (istk[isp--])
 #define istk_push(v)   (istk[++isp] = v)
@@ -80,15 +83,12 @@ int tprocess(instr_t* __restrict__ prog)
     callstack_t cstk;
     init_callstack();
 
+    register t_int ireg[8];
+
     register int isp = -1;
     register int fsp = -1;
     register int csp = 0;
     register int ip  = 0;
-    register t_int iop_left;
-    register t_int iop_right;
-    register t_float fop_left;
-    register t_float fop_right;
-    register char boolflag = 0;
 
     t_int ireg[IREG_SIZE];
     t_float freg[FREG_SIZE];
@@ -99,29 +99,60 @@ int tprocess(instr_t* __restrict__ prog)
 
 
 
-
+    // Program execution begins here.
     execute_next(prog[ip]);
 
 
+/// CONTOL TRANSFER INSTRUCTIONS.
+    // Conditional / Unconditional Branching.
     jump:
         ip = iop(0);
         execute_next(prog[ip]);
 
-    jump_t:
-        if (boolflag == 1)
+    jump_eql:
+        if (IARITH_OP_A == IARITH_OP_B)
+            ip = iop(0);
+        else
+            ++ip;
+        execute_next(prog[ip]);
+
+    jump_neql:
+        if (IARITH_OP_A != IARITH_OP_B)
+            ip = iop(0);
+        else
+            ++ip;
+        execute_next(prog[ip]);
+
+    jump_gt_eql:
+        if (IARITH_OP_A >= IARITH_OP_B)
+            ip = iop(0);
+        else
+            ++ip;
+        execute_next(prog[ip]);
+
+    jump_lt_eql:
+        if (IARITH_OP_A <= IARITH_OP_B)
+            ip = iop(0);
+        else
+            ++ip;
+        execute_next(prog[ip]);
+
+    jump_gt:
+        if (IARITH_OP_A > IARITH_OP_B)
+            ip = iop(0);
+        else
+            ++ip;
+        execute_next(prog[ip]);
+
+    jump_lt:
+        if (IARITH_OP_A < IARITH_OP_B)
             ip = iop(0);
         else
             ++ip;
         execute_next(prog[ip]);
 
 
-    jump_f:
-        if (boolflag == 1)
-            ip = iop(0);
-        else
-            ++ip;
-        execute_next(prog[ip]);
-
+    // Recursive Subroutine Instructions.
     call:
         // Finalise the current frame then set up the new one.
         ++(csp);
@@ -160,85 +191,248 @@ int tprocess(instr_t* __restrict__ prog)
         // Jump to the frame's return instruction.
         execute_next(prog[ip]);
 
-    i_const:
+
+/// INTEGER REGISTERS INSTRUCTIONS.
+    // Data Copying.
+    ireg_load_c:
+        ireg[iop(0)] = iop(1);
+        execute_next(prog[++ip]);
+
+    ireg_load_s:
+        ireg[iop(0)] = istk[isp - iop(1));
+        execute_next(prog[++ip]);
+
+(IARITH_OP_A >= IARITH_OP_B)
+
+    iregR_load_c:
+        ireg[1] = iop(0);
+        execute_next(prog[++ip]);
+
+    iregS_load_s:
+        ireg[1] = istk[isp - iop(1));
+        execute_next(prog[++ip]);
+
+    iregL_load_c:
+        ireg[2] = iop(0);
+        execute_next(prog[++ip]);
+
+    iregL_load_s:
+        ireg[2] = istk[isp - iop(1));
+        execute_next(prog[++ip]);
+
+    iregR_load_c:
+        ireg[3] = iop(0);
+        execute_next(prog[++ip]);
+
+    iregR_load_s:
+        ireg[3] = istk[isp - iop(1));
+        execute_next(prog[++ip]);
+
+    ireg_swap:
+        i = ireg[iop(0)];
+        ireg[iop(0)] = ireg[iop(1)];
+        ireg[iop(1)] = i;
+        execute_next(prog[++ip]);
+
+    ireg_swap_s:
+        i = ireg[iop(0)];
+        ireg[iop(0)] = istk[iop(1)];
+        ireg[iop(1)] = i;
+        execute_next(prog[++ip]);
+
+
+    // Binary/Unary Logic.
+    ireg_eql:
+        IARITH_OP_A = IARITH_OP_A == IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_neql:
+        IARITH_OP_A = IARITH_OP_A != IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_gt_eql:
+        IARITH_OP_A = IARITH_OP_A >= IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_lt_eql:
+        IARITH_OP_A = IARITH_OP_A <= IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_gt:
+        IARITH_OP_A = IARITH_OP_A > IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_lt:
+        IARITH_OP_A = IARITH_OP_A < IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_and:
+        IARITH_OP_A = IARITH_OP_A && IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_or:
+        IARITH_OP_A = IARITH_OP_A || IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_not:
+        IARITH_OP_A = !IARITH_OP_A;
+        execute_next(prog[++ip]);
+
+    ireg_AND:
+        IARITH_OP_A = IARITH_OP_A & IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_OR:
+        IARITH_OP_A = IARITH_OP_A | IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_XOR:
+        IARITH_OP_A = IARITH_OP_A ^ IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_NOT:
+        IARITH_OP_A = ~IARITH_OP_A;
+        execute_next(prog[++ip]);
+
+    ireg_LSHIFT:
+        IARITH_OP_A = IARITH_OP_A << IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_LRIGHT:
+        IARITH_OP_A = IARITH_OP_A >> IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    // Binary/Unary Arithmetic.
+    ireg_inc:
+        ++IARITH_OP_A;
+        execute_next(prog[++ip]);
+
+    ireg_dec:
+        --IARITH_OP_A;
+        execute_next(prog[++ip]);
+
+    ireg_add:
+        IARITH_OP_A += IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_sub:
+        IARITH_OP_A -= IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_mul:
+        IARITH_OP_A *= IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_div:
+        IARITH_OP_A /= IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+    ireg_mod:
+        IARITH_OP_A %= IARITH_OP_B;
+        execute_next(prog[++ip]);
+
+
+/// INTEGER STACK INSTRUCTIONS.
+    // Data Copying.
+    istk_push_c:
         istk_push(iop(0));
         execute_next(prog[++ip]);
 
-    i_pop:
+    istk_push_r:
+        istk_push(ireg[iop(0)]);
+        execute_next(prog[++ip]);
+
+    istk_pop:
         --isp;
         execute_next(prog[++ip]);
 
-    // Integer Logic.
-    i_eql:
-        boolflag = istk_pop() == istk_pop();
+    istk_pop_r:
+        ireg[isop(0)] = istk_pop();
         execute_next(prog[++ip]);
 
-    i_neql:
-        boolflag = istk_pop() == istk_pop();
+    istk_swap:
+        i = istk[iop(0)];
+        istk[iop(0)] = istk[iop(1)];
+        istk[iop(1)] = i;
         execute_next(prog[++ip]);
 
-    i_gt_eql:
-        boolflag = istk_pop() == istk_pop();
-        execute_next(prog[++ip]);
-
-
-    i_lt_eql:
-        boolflag = istk_pop() == istk_pop();
-        execute_next(prog[++ip]);
-
-    i_gt:
-        boolflag = istk_pop() == istk_pop();
-        execute_next(prog[++ip]);
-
-    i_lt:
-        boolflag = istk_pop() == istk_pop();
-        execute_next(prog[++ip]);
-
-    i_and:
-        boolflag = istk_pop() == istk_pop();
-        execute_next(prog[++ip]);
-
-    i_or:
-        boolflag = istk_pop() == istk_pop();
-        execute_next(prog[++ip]);
-
-    i_not:
-        boolflag = !istk_pop();
+    istk_reset:
+        isp = 0;
         execute_next(prog[++ip]);
 
 
-    // Integer Arithmetic.
-    i_add:
-        istk_top = istk_pop() + istk_top;
+    // Binary/Unary Logic.
+    istk_eql:
+        istk_top = istk_pop() == istk_top;
         execute_next(prog[++ip]);
 
-    i_sub:
-        istk_top = istk_pop() - istk_top;
+    istk_neql:
+        istk_top = istk_pop() != istk_top;
         execute_next(prog[++ip]);
 
-    i_mul:
-        istk_top = istk_pop() * istk_top;
+    istk_gt_eql:
+        istk_top = istk_pop() >= istk_top;
         execute_next(prog[++ip]);
 
-    i_div:
-        istk_top = istk_pop() / istk_top;
+    istk_lt_eql:
+        istk_top = istk_pop() <= istk_top;
         execute_next(prog[++ip]);
 
-    i_mod:
-        istk_top = istk_pop() % istk_top;
+    istk_gt:
+        istk_top = istk_pop() > istk_top;
         execute_next(prog[++ip]);
 
-    i_inv:
-        istk_top = ~istk_top;
+    istk_lt:
+        istk_top = istk_pop() > istk_top;
         execute_next(prog[++ip]);
 
-    i_inc:
+    istk_and:
+        istk_top = istk_pop() && istk_top;
+        execute_next(prog[++ip]);
+
+    istk_or:
+        istk_top = istk_pop() || istk_top;
+        execute_next(prog[++ip]);
+
+    istk_not:
+        istk_top = !istk_pop();
+        execute_next(prog[++ip]);
+
+
+    // Binary/Unary Arithmetic.
+    istk_inc:
         ++istk_top;
         execute_next(prog[++ip]);
 
-    i_dec:
+    istk_dec:
         --istk_top;
         execute_next(prog[++ip]);
+
+    istk_add:
+        istk_top = istk_pop() + istk_top;
+        execute_next(prog[++ip]);
+
+    istk_sub:
+        istk_top = istk_pop() - istk_top;
+        execute_next(prog[++ip]);
+
+    istk_mul:
+        istk_top = istk_pop() * istk_top;
+        execute_next(prog[++ip]);
+
+    istk_div:
+        istk_top = istk_pop() / istk_top;
+        execute_next(prog[++ip]);
+
+    istk_mod:
+        istk_top = istk_pop() % istk_top;
+        execute_next(prog[++ip]);
+
+    istk_inv:
+        istk_top = ~istk_top;
+        execute_next(prog[++ip]);
+
+
 
 
 
